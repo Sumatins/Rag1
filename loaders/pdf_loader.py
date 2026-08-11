@@ -1,57 +1,79 @@
+import os
+
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import (
-    RecursiveCharacterTextSplitter,
-    CharacterTextSplitter,
-)
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 
-def load_and_split_pdf(
-    file_path,
+def load_multiple_pdfs(
+    pdf_paths,
     chunk_size=1000,
     chunk_overlap=200,
-    strategy="recursive",
 ):
     """
-    Load a PDF and split it according to the selected
-    chunking strategy, chunk size, and overlap.
+    Load multiple PDF files and split them into chunks.
+
+    Parameters:
+        pdf_paths: List of PDF file paths
+        chunk_size: Size of each chunk
+        chunk_overlap: Overlap between chunks
+
+    Returns:
+        List of document chunks
     """
 
-    # Load PDF
-    loader = PyPDFLoader(file_path)
+    all_documents = []
 
-    documents = loader.load()
+    # --------------------------------------------------------
+    # Load every PDF
+    # --------------------------------------------------------
 
-    # Select chunking strategy
-    if strategy == "recursive":
+    for pdf_path in pdf_paths:
 
-        splitter = RecursiveCharacterTextSplitter(
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            separators=[
-                "\n\n",
-                "\n",
-                ". ",
-                " ",
-                "",
-            ],
-        )
+        loader = PyPDFLoader(pdf_path)
 
-    elif strategy == "character":
+        documents = loader.load()
 
-        splitter = CharacterTextSplitter(
-            separator="\n",
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            length_function=len,
-        )
+        # Add PDF name to metadata
+        for document in documents:
 
-    else:
+            document.metadata["source"] = os.path.basename(
+                pdf_path
+            )
 
-        raise ValueError(
-            f"Unknown chunking strategy: {strategy}"
-        )
+        all_documents.extend(documents)
 
-    # Split documents
-    chunks = splitter.split_documents(documents)
+
+    # --------------------------------------------------------
+    # Chunk all documents
+    # --------------------------------------------------------
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        separators=[
+            "\n\n",
+            "\n",
+            ". ",
+            " ",
+            "",
+        ],
+    )
+
+
+    chunks = splitter.split_documents(
+        all_documents
+    )
+
+
+    # --------------------------------------------------------
+    # Make sure source metadata is preserved
+    # --------------------------------------------------------
+
+    for chunk in chunks:
+
+        if "source" not in chunk.metadata:
+
+            chunk.metadata["source"] = "Unknown"
+
 
     return chunks

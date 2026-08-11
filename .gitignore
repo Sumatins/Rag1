@@ -1,5 +1,9 @@
 .env
 .venv/
+.venv-1/
 __pycache__/
 *.pyc
+data/
+temp_uploads/
 chroma_db/
+chrom_db/
