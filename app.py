@@ -1,150 +1,111 @@
 import streamlit as st
-import PyPDF2
 
-# -----------------------------------
+# ---------------------------------------
 # Page Configuration
-# -----------------------------------
+# ---------------------------------------
 st.set_page_config(
-    page_title="PDF Q&A - Top K Retrieval",
-    page_icon="📚"
+    page_title="Conversational Memory Chatbot",
+    page_icon="🤖"
 )
 
-st.title("📚 PDF Question Answering")
+st.title("🤖 Conversational Memory Chatbot")
 
-st.write("Upload PDFs and select how many relevant results to retrieve.")
+st.write("This chatbot remembers the previous messages in the conversation.")
 
-# -----------------------------------
-# PDF Upload
-# -----------------------------------
-uploaded_files = st.file_uploader(
-    "Upload PDF files",
-    type=["pdf"],
-    accept_multiple_files=True
-)
+# ---------------------------------------
+# Initialize Chat History
+# ---------------------------------------
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# -----------------------------------
-# TOP-K SLIDER
-# -----------------------------------
-top_k = st.slider(
-    "Select Top-K",
-    min_value=1,
-    max_value=10,
-    value=3,
-    step=1
-)
+# ---------------------------------------
+# Display Previous Messages
+# ---------------------------------------
+for message in st.session_state.messages:
 
-st.write(f"Selected Top-K: **{top_k}**")
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
 
-# -----------------------------------
-# Read Uploaded PDFs
-# -----------------------------------
-documents = []
+# ---------------------------------------
+# Chat Input
+# ---------------------------------------
+user_input = st.chat_input("Type your message...")
 
-if uploaded_files:
+if user_input:
 
-    for uploaded_file in uploaded_files:
+    # Save user's message
+    st.session_state.messages.append({
+        "role": "user",
+        "content": user_input
+    })
 
-        pdf_reader = PyPDF2.PdfReader(uploaded_file)
+    # ---------------------------------------
+    # Simple memory-based response
+    # ---------------------------------------
+    user_text = user_input.lower()
 
-        pdf_text = ""
+    if "my name is" in user_text:
 
-        for page_number, page in enumerate(pdf_reader.pages, start=1):
+        name = user_input.split("my name is", 1)[1].strip()
 
-            text = page.extract_text()
+        st.session_state.user_name = name
 
-            if text:
-                pdf_text += text + "\n"
+        response = f"Nice to meet you, {name}! I will remember your name during this chat."
 
-        documents.append({
-            "filename": uploaded_file.name,
-            "text": pdf_text
-        })
+    elif "what is my name" in user_text:
 
-    st.success(
-        f"{len(documents)} PDF(s) uploaded successfully."
-    )
+        if "user_name" in st.session_state:
 
-# -----------------------------------
-# Question
-# -----------------------------------
-question = st.text_input(
-    "Ask a question about your PDFs:"
-)
+            response = (
+                f"Your name is {st.session_state.user_name}. "
+                "I remember it from our earlier conversation."
+            )
 
-# -----------------------------------
-# Retrieval
-# -----------------------------------
-if question and documents:
+        else:
 
-    question_words = question.lower().split()
+            response = "You haven't told me your name yet."
 
-    results = []
+    elif "hello" in user_text or "hi" in user_text:
 
-    # Calculate relevance score for every PDF
-    for document in documents:
+        if "user_name" in st.session_state:
 
-        document_text = document["text"].lower()
+            response = f"Hello {st.session_state.user_name}! How can I help you?"
 
-        score = sum(
-            1 for word in question_words
-            if word in document_text
-        )
+        else:
 
-        results.append({
-            "filename": document["filename"],
-            "text": document["text"],
-            "score": score
-        })
-
-    # Sort by relevance score
-    results = sorted(
-        results,
-        key=lambda x: x["score"],
-        reverse=True
-    )
-
-    # -----------------------------------
-    # Apply TOP-K
-    # -----------------------------------
-    top_results = results[:top_k]
-
-    # -----------------------------------
-    # Answer
-    # -----------------------------------
-    st.subheader("💡 Answer")
-
-    if top_results and top_results[0]["score"] > 0:
-
-        answer = top_results[0]["text"][:2000]
-
-        st.write(answer)
-
-        # -----------------------------------
-        # Source Citations
-        # -----------------------------------
-        st.subheader("📚 Source Citations")
-
-        for result in top_results:
-
-            if result["score"] > 0:
-
-                st.write(
-                    f"📄 **{result['filename']}** "
-                    f"(Relevance Score: {result['score']})"
-                )
+            response = "Hello! How can I help you?"
 
     else:
 
-        st.warning(
-            "No relevant information was found in the uploaded PDFs."
+        # Count previous messages to demonstrate memory
+        message_count = len(st.session_state.messages)
+
+        response = (
+            f"I remember our conversation. "
+            f"This is message #{message_count} from you."
         )
 
-# -----------------------------------
-# Instructions
-# -----------------------------------
-else:
+    # Save chatbot response
+    st.session_state.messages.append({
+        "role": "assistant",
+        "content": response
+    })
 
-    st.info(
-        "Upload PDFs and enter a question to retrieve relevant results."
-    )
+    # Display chatbot response
+    with st.chat_message("assistant"):
+        st.write(response)
+
+# ---------------------------------------
+# Clear Conversation
+# ---------------------------------------
+if st.session_state.messages:
+
+    if st.button("🗑️ Clear Conversation"):
+
+        st.session_state.messages = []
+
+        if "user_name" in st.session_state:
+            del st.session_state.user_name
+
+        st.rerun()
 
